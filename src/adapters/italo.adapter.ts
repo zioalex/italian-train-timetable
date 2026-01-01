@@ -25,12 +25,16 @@ export class ItaloAdapter extends BaseAdapter {
     this.apiEndpoint = config?.endpoint;
   }
 
+  /**
+   * Configure API credentials (for future B2B integration)
+   */
   configure(apiKey: string, endpoint: string): void {
     this.apiKey = apiKey;
     this.apiEndpoint = endpoint;
   }
 
   async isAvailable(): Promise<boolean> {
+    // Italo B2B API not yet integrated
     return false;
   }
 
@@ -39,6 +43,13 @@ export class ItaloAdapter extends BaseAdapter {
       console.log('Italo adapter not available - B2B integration pending');
       return [];
     }
+
+    // TODO: Implement when B2B API is available
+    // Expected flow:
+    // 1. Authenticate with API key
+    // 2. Search journeys with from/to/date
+    // 3. Parse response to JourneySolution format
+    
     return [];
   }
 
@@ -51,10 +62,13 @@ export class ItaloAdapter extends BaseAdapter {
   }
 
   async searchStations(query: string): Promise<Station[]> {
+    // Italo serves major stations only
+    // These could be hardcoded or fetched from API
     const italoStations: Station[] = [
       { id: 'NPI', name: 'Napoli Centrale' },
       { id: 'NAF', name: 'Napoli Afragola' },
       { id: 'RMT', name: 'Roma Termini' },
+      { id: 'RMT', name: 'Roma Tiburtina' },
       { id: 'FIR', name: 'Firenze S.M.N.' },
       { id: 'BOC', name: 'Bologna Centrale' },
       { id: 'MIC', name: 'Milano Centrale' },
@@ -62,9 +76,16 @@ export class ItaloAdapter extends BaseAdapter {
       { id: 'TOR', name: 'Torino Porta Nuova' },
       { id: 'VEN', name: 'Venezia Mestre' },
       { id: 'VES', name: 'Venezia Santa Lucia' },
+      { id: 'VER', name: 'Verona Porta Nuova' },
+      { id: 'PAD', name: 'Padova' },
+      { id: 'SAL', name: 'Salerno' },
+      { id: 'REG', name: 'Reggio Emilia AV' },
     ];
+
     const lowerQuery = query.toLowerCase();
-    return italoStations.filter(s => s.name.toLowerCase().includes(lowerQuery));
+    return italoStations.filter(s => 
+      s.name.toLowerCase().includes(lowerQuery)
+    );
   }
 
   async getStation(stationId: string): Promise<Station | null> {
@@ -85,4 +106,5 @@ export class ItaloAdapter extends BaseAdapter {
   }
 }
 
+// Export singleton instance
 export const italo = new ItaloAdapter();

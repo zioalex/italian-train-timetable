@@ -1,0 +1,109 @@
+Totally agree - let's focus on what's actually accessible. Here's the updated plan:
+🚂 Italian Train Search App - Requirements & Architecture
+Scope (MVP)
+Operator
+Data Source
+Coverage
+Trenitalia
+ViaggiaTreno API (unofficial, no auth)
+Real-time, journey search, delays, alerts
+Trenord
+GTFS (official) + ViaggiaTreno fallback
+Schedules + partial real-time
+Italo
+🔒 Deferred
+Architecture ready for B2B integration
+Core Features (MVP)
+Journey Search
+From station → To station → Date/Time
+Show available trains across Trenitalia + Trenord
+Display: departure, arrival, duration, changes
+Real-time Status
+Current delay (minutes)
+Platform information
+Train position on route
+Service Alerts ⚠️
+Line works / disruptions
+Strikes
+Connection risks (if your connection might be missed due to delay)
+Proposed Tech Stack
+Layer
+Technology
+Rationale
+Frontend
+React + TypeScript
+Web-first, easy port to React Native later
+Backend
+Node.js + Express (or Fastify)
+Fast API development, good for aggregating multiple sources
+Database
+PostgreSQL + Redis
+GTFS storage + caching for API responses
+Styling
+Tailwind CSS
+Quick, consistent UI
+Architecture (Pluggable Operators)
+┌─────────────────────────────────────────────────────────┐
+│                      Frontend (React)                    │
+│         Search UI  │  Results  │  Alerts  │  Details    │
+└──────────────────────────┬──────────────────────────────┘
+                           │ REST API
+┌──────────────────────────▼──────────────────────────────┐
+│                    Backend API Gateway                   │
+│                                                          │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │            Operator Adapter Interface            │    │
+│  │  - searchJourneys(from, to, date)               │    │
+│  │  - getTrainStatus(trainId)                      │    │
+│  │  - getAlerts(region?)                           │    │
+│  │  - getStations()                                │    │
+│  └─────────────────────────────────────────────────┘    │
+│           │                │               │             │
+│  ┌────────▼─────┐  ┌───────▼──────┐  ┌─────▼──────┐     │
+│  │  Trenitalia  │  │   Trenord    │  │   Italo    │     │
+│  │   Adapter    │  │   Adapter    │  │  Adapter   │     │
+│  │ (ViaggiaTr.) │  │ (GTFS+VT)    │  │  (B2B TBD) │     │
+│  └──────────────┘  └──────────────┘  └────────────┘     │
+│                                           🔒 Future      │
+└─────────────────────────────────────────────────────────┘
+Data Flow Example
+User searches: Milano Centrale → Roma Termini, tomorrow 9:00
+Frontend calls GET /api/search?from=milano&to=roma&date=2024-01-15T09:00
+Backend queries all active adapters in parallel
+Trenitalia Adapter → ViaggiaTreno /soluzioniViaggioNew/...
+Trenord Adapter → checks if route is regional (unlikely for this route)
+Results merged, sorted by departure time
+Each result enriched with real-time delay data
+Alerts checked for affected lines
+Project Structure
+train-search/
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── hooks/
+│   │   └── services/api.ts
+│   └── package.json
+│
+├── backend/
+│   ├── src/
+│   │   ├── adapters/
+│   │   │   ├── base.adapter.ts      # Interface
+│   │   │   ├── trenitalia.adapter.ts
+│   │   │   ├── trenord.adapter.ts
+│   │   │   └── italo.adapter.ts     # Stub for later
+│   │   ├── routes/
+│   │   ├── services/
+│   │   └── utils/
+│   └── package.json
+│
+└── shared/
+    └── types/                        # Shared TypeScript types
+Next Steps
+Phase 1: Set up project structure + ViaggiaTreno API wrapper
+Phase 2: Build Trenitalia adapter with search + real-time
+Phase 3: Add Trenord (GTFS import + adapter)
+Phase 4: Frontend with search UI
+Phase 5: Alerts system
+Future: Italo B2B integration when/if partnership available
+Want me to start building? I'd suggest beginning with Phase 1 - setting up the backend structure and getting the ViaggiaTreno API working first, since that's the foundation for everything else.
