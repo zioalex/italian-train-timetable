@@ -1,10 +1,10 @@
 import { Alert, AlertType } from '../types/index.js';
 
-interface AlertSource { name: string; fetchAlerts(): Promise<Alert[]>; }
+interface AlertSource { name: string; fetchAlerts(): Promise&lt;Alert[]&gt;; }
 interface StoredAlert extends Alert { createdAt: Date; expiresAt?: Date; source: string; }
 
 export class AlertsService {
-  private alerts: Map<string, StoredAlert> = new Map();
+  private alerts: Map&lt;string, StoredAlert&gt; = new Map();
   private sources: AlertSource[] = [];
   private lastFetch: Date | null = null;
   private fetchInterval: number = 5 * 60 * 1000;
@@ -14,66 +14,80 @@ export class AlertsService {
     this.sources.push(new TrenordAlertsSource());
   }
 
-  async getAlerts(options?: { region?: string; line?: string; severity?: Alert['severity']; type?: AlertType; }): Promise<Alert[]> {
+  async getAlerts(options?: { region?: string; line?: string; severity?: Alert['severity']; type?: AlertType }): Promise&lt;Alert[]&gt; {
     await this.refreshAlertsIfNeeded();
-    let alerts = Array.from(this.alerts.values()).filter(a => !a.expiresAt || a.expiresAt > new Date());
-    if (options?.severity) alerts = alerts.filter(a => a.severity === options.severity);
-    if (options?.type) alerts = alerts.filter(a => a.type === options.type);
-    if (options?.line) alerts = alerts.filter(a => a.affectedLines?.some(l => l.toLowerCase().includes(options.line!.toLowerCase())));
-    return alerts.sort((a, b) => {
-      const severityOrder: Record<string, number> = { critical: 0, warning: 1, info: 2 };
-      return (severityOrder[a.severity] || 2) - (severityOrder[b.severity] || 2);
+    let alerts = Array.from(this.alerts.values()).filter(a =&gt; !a.expiresAt || a.expiresAt &gt; new Date());
+    if (options?.severity) alerts = alerts.filter(a =&gt; a.severity === options.severity);
+    if (options?.type) alerts = alerts.filter(a =&gt; a.type === options.type);
+    if (options?.line) alerts = alerts.filter(a =&gt; a.affectedLines?.some(l =&gt; l.toLowerCase().includes(options.line!.toLowerCase())));
+    return alerts.sort((a, b) =&gt; {
+      const severityOrder = { critical: 0, warning: 1, info: 2 };
+      const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
+      if (severityDiff !== 0) return severityDiff;
+      return (b as StoredAlert).createdAt.getTime() - (a as StoredAlert).createdAt.getTime();
     });
   }
 
-  async getAlertsForJourney(fromStation: string, toStation: string, lines: string[]): Promise<Alert[]> {
+  async getAlertsForJourney(fromStation: string, toStation: string, lines: string[]): Promise&lt;Alert[]&gt; {
     const allAlerts = await this.getAlerts();
-    return allAlerts.filter(alert => {
+    return allAlerts.filter(alert =&gt; {
       if (alert.affectedLines?.length) {
-        if (alert.affectedLines.some(al => lines.some(l => l.toLowerCase().includes(al.toLowerCase())))) return true;
+        const hasMatchingLine = alert.affectedLines.some(affectedLine =&gt; 
+          lines.some(line =&gt; line.toLowerCase().includes(affectedLine.toLowerCase()) || affectedLine.toLowerCase().includes(line.toLowerCase()))
+        );
+        if (hasMatchingLine) return true;
       }
       if (alert.affectedStations?.length) {
-        if (alert.affectedStations.some(s => s.name.toLowerCase().includes(fromStation.toLowerCase()) || s.name.toLowerCase().includes(toStation.toLowerCase()))) return true;
+        const hasMatchingStation = alert.affectedStations.some(station =&gt; 
+          station.name.toLowerCase().includes(fromStation.toLowerCase()) || station.name.toLowerCase().includes(toStation.toLowerCase()) ||
+          fromStation.toLowerCase().includes(station.name.toLowerCase()) || toStation.toLowerCase().includes(station.name.toLowerCase())
+        );
+        if (hasMatchingStation) return true;
       }
       return false;
     });
   }
 
-  addAlert(alert: Omit<Alert, 'id'>, expiresInHours?: number): Alert {
+  addAlert(alert: Omit&lt;Alert, 'id'&gt;, expiresInHours?: number): Alert {
     const id = `manual-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const storedAlert: StoredAlert = { ...alert, id, createdAt: new Date(), expiresAt: expiresInHours ? new Date(Date.now() + expiresInHours * 3600000) : undefined, source: 'manual' };
+    const storedAlert: StoredAlert = { ...alert, id, createdAt: new Date(), expiresAt: expiresInHours ? new Date(Date.now() + expiresInHours * 60 * 60 * 1000) : undefined, source: 'manual' };
     this.alerts.set(id, storedAlert);
     return storedAlert;
   }
 
   removeAlert(id: string): boolean { return this.alerts.delete(id); }
 
-  private async refreshAlertsIfNeeded(): Promise<void> {
+  private async refreshAlertsIfNeeded(): Promise&lt;void&gt; {
     const now = new Date();
-    if (this.lastFetch && (now.getTime() - this.lastFetch.getTime()) < this.fetchInterval) return;
+    if (this.lastFetch &amp;&amp; (now.getTime() - this.lastFetch.getTime()) &lt; this.fetchInterval) return;
     try {
-      const results = await Promise.all(this.sources.map(s => s.fetchAlerts().catch(() => [] as Alert[])));
+      const fetchPromises = this.sources.map(source =&gt; source.fetchAlerts().catch(() =&gt; [] as Alert[]));
+      const results = await Promise.all(fetchPromises);
       for (const alerts of results) for (const alert of alerts) this.alerts.set(alert.id, { ...alert, createdAt: new Date(), source: 'external' });
       this.lastFetch = now;
-    } catch (e) { console.error('Failed to refresh alerts:', e); }
+    } catch (error) { console.error('Failed to refresh alerts:', error); }
   }
 
-  async getStrikes(): Promise<Alert[]> { return this.getAlerts({ type: 'strike' }); }
-  async isStrikeActive(): Promise<boolean> {
+  async getStrikes(): Promise&lt;Alert[]&gt; { return this.getAlerts({ type: 'strike' }); }
+  
+  async isStrikeActive(): Promise&lt;boolean&gt; {
     const strikes = await this.getStrikes();
     const now = new Date();
-    return strikes.some(s => (!s.startTime || !s.endTime) || (now >= new Date(s.startTime) && now <= new Date(s.endTime)));
+    return strikes.some(strike =&gt; { 
+      if (!strike.startTime || !strike.endTime) return true; 
+      return now &gt;= new Date(strike.startTime) &amp;&amp; now &lt;= new Date(strike.endTime); 
+    });
   }
 }
 
 class TrenitaliaAlertsSource implements AlertSource {
   name = 'trenitalia';
-  async fetchAlerts(): Promise<Alert[]> { return []; }
+  async fetchAlerts(): Promise&lt;Alert[]&gt; { return []; }
 }
 
 class TrenordAlertsSource implements AlertSource {
   name = 'trenord';
-  async fetchAlerts(): Promise<Alert[]> { return []; }
+  async fetchAlerts(): Promise&lt;Alert[]&gt; { return []; }
 }
 
 export const alertsService = new AlertsService();
