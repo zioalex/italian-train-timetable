@@ -1,0 +1,32 @@
+run = "npm run start:replit"
+entrypoint = "src/server.ts"
+
+[nix]
+channel = "stable-24_05"
+
+[env]
+PATH = "/home/runner/$REPL_SLUG/node_modules/.bin:$PATH"
+PORT = "3000"
+GTFS_PATH = "./data/trenord_gtfs"
+
+[packager]
+language = "nodejs"
+
+[packager.features]
+packageSearch = true
+guessImports = true
+enabledForHosting = true
+
+[languages]
+[languages.typescript]
+pattern = "**/{*.ts,*.tsx}"
+[languages.typescript.languageServer]
+start = "typescript-language-server --stdio"
+
+[deployment]
+run = ["sh", "-c", "npm run start:replit"]
+build = ["sh", "-c", "npm run build:replit"]
+
+[[ports]]
+localPort = 3000
+externalPort = 80
